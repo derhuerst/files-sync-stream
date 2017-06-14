@@ -40,6 +40,7 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 	const endpoint = new EventEmitter()
 	const files = {} // by id
 	let currentFile = null
+	let done = false
 
 	signaling.on('file', ({id, metadata}) => {
 		if (!id) return
@@ -57,22 +58,21 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 
 
 	const endCurrentFile = () => {
-		if (currentFile) {
-			const file = currentFile
-			currentFile = null
-			file.status = 'done'
-			file.emit('end')
-		}
+		if (!currentFile) return
+		const file = currentFile
+
+		currentFile = null
+		file.status = 'done'
+		file.emit('end')
 	}
 
 	const startFile = (file) => {
-		if (!currentFile || currentFile.id !== file.id) {
-			endCurrentFile()
+		if (currentFile && currentFile.id === file.id) return
+		if (currentFile) endCurrentFile()
 
-			currentFile = file
-			file.status = 'active'
-			file.emit('start')
-		}
+		currentFile = file
+		file.status = 'active'
+		file.emit('start')
 	}
 
 	signaling.on('receive', (fileId) => {
@@ -86,9 +86,7 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 		if (!fileId || !files[fileId]) return
 		const file = files[fileId]
 
-		send(file, () => {
-			signaling.send('done', file.id)
-		})
+		send(file, checkIfDone)
 	})
 
 	signaling.on('done', (fileId) => {
@@ -111,6 +109,7 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 
 				if (!chunk) { // end of file
 					endCurrentFile()
+					signaling.send('done', file.id)
 					cb()
 				} else {
 					data.write(chunk)
@@ -122,7 +121,8 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 	}
 
 	const receive = (file, cb) => { // as leader
-		if (!currentFile || currentFile.id !== file.id) startFile(file)
+		startFile(file)
+
 		file.once('end', cb)
 	}
 
@@ -136,7 +136,6 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 			if (file.mode === 'send') {
 				signaling.send('receive', file.id)
 				send(file, () => {
-					signaling.send('done', file.id)
 					next()
 				})
 			} else {
@@ -146,20 +145,34 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 
 			return // abort loop
 		}
-
-		endpoint.emit('done')
+		checkIfDone()
 	}
 
+	const checkIfDone = () => {
+		if (done) return
+
+		for (let id in files) {
+			if (files[id].status === 'queued') return // abort loop
+			if (files[id].status === 'active') return // abort loop
+		}
+
+		done = true
+		endpoint.emit('done')
+	}
+	signaling.on('done', checkIfDone)
 
 
-	const add = (read, metadata) => {
+
+	const add = (read, metadata = {}) => {
 		const file = createFile(metadata, false)
 		file.read = read
 		files[file.id] = file
 
-		signaling.send('file', {id: file.id, metadata})
-		endpoint.emit('file', file)
-		next()
+		setImmediate(() => {
+			endpoint.emit('file', file)
+			signaling.send('file', {id: file.id, metadata})
+			next()
+		})
 	}
 
 	endpoint.add = add
