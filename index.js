@@ -28,7 +28,6 @@ const createEndpoint = (data, signaling, isLeader) => {
 			msg = JSON.parse(msg.toString('utf8'))
 		} catch (err) {} // invalid message, ignore this
 		if (!msg.type || msg.payload === undefined) return
-		console.error(isLeader ? 'leader' : 'follower', '<-', msg.type)
 		signaling.emit(msg.type, msg.payload)
 	})
 	signaling.send = (type, payload) => {
@@ -47,7 +46,6 @@ const createEndpoint = (data, signaling, isLeader) => {
 
 		const file = createFile(metadata, true, id)
 		files[id] = file
-
 		endpoint.emit('file', file)
 	})
 
@@ -58,30 +56,58 @@ const createEndpoint = (data, signaling, isLeader) => {
 
 
 
-	signaling.on('receive', (fileId) => {
-		if (!fileId || !files[fileId]) return
-		if (currentFile && currentFile.id === fileId) return
+	const endCurrentFile = () => {
+		if (currentFile) {
+			const file = currentFile
+			currentFile = null
+			file.status = 'done'
+			file.emit('end')
+		}
+	}
 
-		if (currentFile) currentFile.emit('end')
-		currentFile = files[fileId]
-		currentFile.emit('start')
-	})
+	const startFile = (file) => {
+		if (!currentFile || currentFile.id !== file.id) {
+			endCurrentFile()
 
-	const send = (file, cb) => {
-		if (currentFile && currentFile.id !== file.id) {
-			currentFile.emit('end')
+			currentFile = file
+			file.status = 'active'
 			file.emit('start')
 		}
-		currentFile = files[file.id]
+	}
+
+	signaling.on('receive', (fileId) => {
+		if (!fileId || !files[fileId]) return
+		const file = files[fileId]
+		startFile(file)
+	})
+
+	signaling.on('send', (fileId) => {
+		if (!fileId || !files[fileId]) return
+		const file = files[fileId]
+
+		send(file, () => {})
+	})
+
+	signaling.on('done', (fileId) => {
+		if (!fileId || !files[fileId]) return
+		endCurrentFile()
+	})
+
+
+
+	const send = (file, cb) => { // as leader
+		if (!currentFile || currentFile.id !== file.id) startFile(file)
 
 		file.read(5, (err, chunk) => {
 			if (err) {
+				file.status = 'failed'
 				file.emit('error', err)
 				return
 			}
 
 			if (!chunk) { // end of file
-				file.emit('end')
+				endCurrentFile()
+				signaling.send('done', file.id)
 				cb()
 			} else {
 				data.write(chunk)
@@ -90,31 +116,33 @@ const createEndpoint = (data, signaling, isLeader) => {
 		})
 	}
 
-	const receive = (file, cb) => {
-		if (currentFile && currentFile.id !== file.id) {
-			currentFile.emit('end')
-			file.emit('start')
-		}
-		currentFile = files[file.id]
-
-		if (!todo) { // todo: find end
-			file.emit('end')
-			cb()
-		}
+	const receive = (file, cb) => { // as leader
+		if (!currentFile || currentFile.id !== file.id) startFile(file)
+		file.once('end', cb)
 	}
-
-
 
 	const next = () => { // check if there's something to do
 		if (!isLeader || currentFile) return
 
 		for (let id in files) {
 			const file = files[id]
-			if (file.status === 'queued') {
-				if (file.mode === 'send') send(file, next)
-				else receive(file, next)
+			if (file.status !== 'queued') continue
+
+			if (file.mode === 'send') {
+				signaling.send('receive', file.id)
+				send(file, () => {
+					signaling.send('done', file.id)
+					next()
+				})
+			} else {
+				signaling.send('send', file.id)
+				receive(file, next)
 			}
+
+			return // abort loop
 		}
+
+		endpoint.emit('done')
 	}
 
 
