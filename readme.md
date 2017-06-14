@@ -1,6 +1,6 @@
 # files-sync-stream
 
-**Sync files over any transport.** Originally made for [avion](https://github.com/derhuerst/avion). Allows you to sync files (or any blobs of data) between two peers, in both directions.
+**Sync files (or any blobs of data) between two peers, in both directions, over any transport.** Originally made for [avion](https://github.com/derhuerst/avion).
 
 [![npm version](https://img.shields.io/npm/v/files-sync-stream.svg)](https://www.npmjs.com/package/files-sync-stream)
 [![build status](https://img.shields.io/travis/derhuerst/files-sync-stream.svg)](https://travis-ci.org/derhuerst/files-sync-stream)
@@ -34,7 +34,7 @@ const createEndpoint = require('files-sync-stream')
 
 const leader = createEndpoint(dataTransport, signalingTransport, true)
 
-leader.on('file', (file) => {
+leader.on('file', (file) => { // handle incoming file
 	file.on('start', () => {
 		console.log('leader started receiving', file.id)
 	})
@@ -53,7 +53,7 @@ leader.on('done', () => console.log('leader is done'))
 
 const follower = endpoint(dataTransport, signalingTransport)
 follower.on('file', (file) => {
-	// …
+	// handle incoming file…
 })
 ```
 

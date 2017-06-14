@@ -169,12 +169,14 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 		files[file.id] = file
 
 		setImmediate(() => {
-			endpoint.emit('file', file)
 			signaling.send('file', {id: file.id, metadata})
 			next()
 		})
+
+		return file
 	}
 
+	endpoint.files = files
 	endpoint.add = add
 	return endpoint
 }
