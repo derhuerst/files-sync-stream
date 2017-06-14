@@ -1,5 +1,7 @@
 # files-sync-stream
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/derhuerst/files-sync-stream.svg)](https://greenkeeper.io/)
+
 **Sync files (or any blobs of data) between two peers, in both directions, over any transport.** Originally made for [avion](https://github.com/derhuerst/avion).
 
 [![npm version](https://img.shields.io/npm/v/files-sync-stream.svg)](https://www.npmjs.com/package/files-sync-stream)
