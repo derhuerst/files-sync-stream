@@ -63,22 +63,27 @@ test('syncs metadata', (t) => {
 	const barMeta = {name: 'bar.bin', size: BAR.byteLength}
 	leader.add(fromBuffer(BAR), barMeta)
 
-	t.plan(2)
+	t.plan(2 * 2)
 	leader.on('file', (file) => {
-		t.deepEqual(file.metadata, fooMeta)
+		if (file.mode === 'receive') t.deepEqual(file.metadata, fooMeta)
+		else t.deepEqual(file.metadata, barMeta)
 	})
 	follower.on('file', (file) => {
-		t.deepEqual(file.metadata, barMeta)
+		if (file.mode === 'receive') t.deepEqual(file.metadata, barMeta)
+		else t.deepEqual(file.metadata, fooMeta)
 	})
 })
 
-test('syncs data follower -> leader 💪', (t) => {
+test.only('syncs data follower -> leader 💪', (t) => {
 	const {leader, follower} = setup()
 	follower.add(fromBuffer(FOO))
 	leader.add(fromBuffer(BAR))
-	t.plan(4)
+	t.plan(5)
 
 	leader.on('file', (file) => {
+		if (file.mode !== 'receive') return
+		t.equal(file.status, 'queued')
+
 		file.on('start', () => {
 			t.equal(file.status, 'active')
 		})
@@ -98,13 +103,16 @@ test('syncs data follower -> leader 💪', (t) => {
 	})
 })
 
-test.only('syncs data leader -> follower 💪', (t) => {
+test('syncs data leader -> follower 💪', (t) => {
 	const {leader, follower} = setup()
 	follower.add(fromBuffer(FOO))
 	leader.add(fromBuffer(BAR))
-	t.plan(4)
+	t.plan(5)
 
 	follower.on('file', (file) => {
+		if (file.mode !== 'receive') return
+		t.equal(file.status, 'queued')
+
 		file.on('start', () => {
 			t.equal(file.status, 'active')
 		})
