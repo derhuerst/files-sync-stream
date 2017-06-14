@@ -16,13 +16,14 @@ const createFile = (metadata, receive = true, id) => {
 	file.metadata = metadata
 	file.mode = receive ? 'receive' : 'send'
 	file.status = 'queued'
+	file.progress = 0
 	return file
 }
 
 // todo: reconnection logic
 // todo: stream error handling
 
-const createEndpoint = (data, signaling, isLeader = false) => {
+const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => {
 	signaling.on('data', (msg) => {
 		try {
 			msg = JSON.parse(msg.toString('utf8'))
@@ -52,6 +53,7 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 
 	data.on('data', (chunk) => {
 		if (!currentFile) return
+		currentFile.progress += chunk.byteLength
 		currentFile.emit('data', chunk)
 	})
 
@@ -100,7 +102,7 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 		startFile(file)
 
 		const step = () => {
-			file.read(5, (err, chunk) => {
+			file.read(chunkSize, (err, chunk) => {
 				if (err) {
 					file.status = 'failed'
 					file.emit('error', err)
@@ -113,6 +115,7 @@ const createEndpoint = (data, signaling, isLeader = false) => {
 					cb()
 				} else {
 					data.write(chunk)
+					file.progress += chunk.byteLength
 					step()
 				}
 			})

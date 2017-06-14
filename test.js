@@ -37,8 +37,8 @@ const setup = () => {
 	const s2 = duplexer(s2write, s2read)
 
 	return {
-		leader: endpoint(d1, s1, true),
-		follower: endpoint(d2, s2)
+		leader: endpoint(d1, s1, true, 5), // leader, 5 bytes chunks
+		follower: endpoint(d2, s2, false, 5) // follower, 5 bytes chunks
 	}
 }
 
@@ -128,5 +128,19 @@ test('syncs data leader -> follower 💪', (t) => {
 
 	follower.on('done', (file) => {
 		t.pass('endpoint emits done')
+	})
+})
+
+test('tracks the file progress', (t) => {
+	const {leader, follower} = setup()
+	follower.add(fromBuffer(FOO))
+
+	leader.once('file', (file) => {
+		let bytes = 0
+		file.on('data', (chunk) => {
+			bytes += chunk.byteLength
+			t.equal(file.progress, bytes)
+		})
+		file.once('end', () => t.end())
 	})
 })

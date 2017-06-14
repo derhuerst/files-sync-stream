@@ -12,7 +12,7 @@
 
 Tings still to be implemented:
 
-- Some kind of progress indicator. Specifying a file size should be optional (to support streams).
+- A basic algorithm to determine the size of the next chunk to be transferred. Should be based on the time to transfer the last chunk. Needs [`ack`](https://en.wikipedia.org/wiki/Transmission_Control_Protocol#Protocol_operation)-ing of chunks.
 - Handling of connection loss, including continuing the sync. This needs a basic have/want logic.
 
 
@@ -39,7 +39,7 @@ leader.on('file', (file) => { // handle incoming file
 		console.log('leader started receiving', file.id)
 	})
 	file.on('data', (chunk) => {
-		console.log('leader received', chunk.toString('hex'))
+		console.log('leader received', file.progress, chunk.toString('hex'))
 	})
 	file.on('end', () => {
 		console.log('leader finished receiving', file.id)
@@ -63,9 +63,7 @@ Use `endpoint.add(read, metadata)` to transfer a file:
 const fromBuffer = require('files-sync-stream/from-buffer')
 
 const data = Buffer.from('aef18a02dd912638', 'hex')
-follower.add(fromBuffer(data), {
-	name: 'file.bin', size: data.byteLength
-})
+follower.add(fromBuffer(data), {name: 'file.bin'})
 ```
 
 
