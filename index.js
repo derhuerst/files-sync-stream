@@ -43,14 +43,6 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 	let currentFile = null
 	let done = false
 
-	signaling.on('file', ({id, metadata}) => {
-		if (!id) return
-
-		const file = createFile(metadata, true, id)
-		files[id] = file
-		endpoint.emit('file', file)
-	})
-
 	data.on('data', (chunk) => {
 		if (!currentFile) return
 		currentFile.progress += chunk.byteLength
@@ -69,8 +61,10 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 	}
 
 	const startFile = (file) => {
-		if (currentFile && currentFile.id === file.id) return
-		if (currentFile) endCurrentFile()
+		if (currentFile) {
+			if (currentFile.id === file.id) return
+			endCurrentFile()
+		}
 
 		currentFile = file
 		file.status = 'active'
@@ -178,6 +172,16 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 
 		return file
 	}
+
+	signaling.on('file', ({id, metadata}) => {
+		if (!id) return
+
+		const file = createFile(metadata, true, id)
+		files[id] = file
+		endpoint.emit('file', file)
+
+		setImmediate(next)
+	})
 
 	endpoint.files = files
 	endpoint.add = add

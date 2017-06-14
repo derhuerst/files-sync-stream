@@ -98,7 +98,7 @@ test('syncs data follower -> leader 💪', (t) => {
 		})
 	})
 
-	leader.on('done', (file) => {
+	leader.on('done', () => {
 		t.pass('endpoint emits done')
 	})
 })
@@ -126,7 +126,7 @@ test('syncs data leader -> follower 💪', (t) => {
 		})
 	})
 
-	follower.on('done', (file) => {
+	follower.on('done', () => {
 		t.pass('endpoint emits done')
 	})
 })
