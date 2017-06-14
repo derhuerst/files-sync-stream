@@ -33,23 +33,23 @@ B.add(fromBuffer(barData), barMeta)
 // subscribe to events
 
 A.on('file', (file) => {
-	console.log('A', file.metadata.name, file.id)
+	console.log('A', file.meta.name, file.id)
 
-	file.on('start', () => console.log('A', file.metadata.name, 'start'))
-	file.on('end', () => console.log('A', file.metadata.name, 'end'))
+	file.on('start', () => console.log('A', file.meta.name, 'start'))
+	file.on('end', () => console.log('A', file.meta.name, 'end'))
 	file.on('data', () => {
-		console.log('A', file.metadata.name, file.progress, '/', file.metadata.size)
+		console.log('A', file.meta.name, file.progress, '/', file.meta.size)
 	})
 })
 A.on('done', () => console.log('A done'))
 
 B.on('file', (file) => {
-	console.log('B', file.metadata.name, file.id)
+	console.log('B', file.meta.name, file.id)
 
-	file.on('start', () => console.log('B', file.metadata.name, 'start'))
-	file.on('end', () => console.log('B', file.metadata.name, 'end'))
+	file.on('start', () => console.log('B', file.meta.name, 'start'))
+	file.on('end', () => console.log('B', file.meta.name, 'end'))
 	file.on('data', () => {
-		console.log('B', file.metadata.name, file.progress, '/', file.metadata.size)
+		console.log('B', file.meta.name, file.progress, '/', file.meta.size)
 	})
 })
 B.on('done', () => console.log('B done'))

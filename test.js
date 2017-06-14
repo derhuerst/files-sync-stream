@@ -61,17 +61,17 @@ test('syncs metadata', (t) => {
 
 	const fooMeta = {name: 'foo.bin', size: FOO.byteLength}
 	const foo = follower.add(fromBuffer(FOO), fooMeta)
-	t.deepEqual(foo.metadata, fooMeta)
+	t.deepEqual(foo.meta, fooMeta)
 
 	const barMeta = {name: 'bar.bin', size: BAR.byteLength}
 	const bar = leader.add(fromBuffer(BAR), barMeta)
-	t.deepEqual(bar.metadata, barMeta)
+	t.deepEqual(bar.meta, barMeta)
 
 	leader.on('file', (file) => {
-		t.deepEqual(file.metadata, fooMeta)
+		t.deepEqual(file.meta, fooMeta)
 	})
 	follower.on('file', (file) => {
-		t.deepEqual(file.metadata, barMeta)
+		t.deepEqual(file.meta, barMeta)
 	})
 })
 

@@ -3,10 +3,10 @@
 const {EventEmitter} = require('events')
 const alphanumericId = require('alphanumeric-id')
 
-const createFile = (metadata, receive = true, id) => {
+const createFile = (meta, receive = true, id) => {
 	const file = new EventEmitter()
 	file.id = id || alphanumericId(8)
-	file.metadata = metadata
+	file.meta = meta
 	file.mode = receive ? 'receive' : 'send'
 	file.status = 'queued'
 	file.progress = 0
@@ -154,23 +154,23 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 
 
 
-	const add = (read, metadata = {}) => {
-		const file = createFile(metadata, false)
+	const add = (read, meta = {}) => {
+		const file = createFile(meta, false)
 		file.read = read
 		files[file.id] = file
 
 		setImmediate(() => {
-			signaling.send('file', {id: file.id, metadata})
+			signaling.send('file', {id: file.id, meta})
 			next()
 		})
 
 		return file
 	}
 
-	signaling.on('file', ({id, metadata}) => {
+	signaling.on('file', ({id, meta}) => {
 		if (!id) return
 
-		const file = createFile(metadata, true, id)
+		const file = createFile(meta, true, id)
 		files[id] = file
 		endpoint.emit('file', file)
 
