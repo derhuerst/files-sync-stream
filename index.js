@@ -1,18 +1,11 @@
 'use strict'
 
 const {EventEmitter} = require('events')
-
-const generateId = () => {
-	let n=6, s=''
-	while (n--) {
-		s += (Math.random() * 16 | 0).toString(16)
-	}
-	return s
-}
+const alphanumericId = require('alphanumeric-id')
 
 const createFile = (metadata, receive = true, id) => {
 	const file = new EventEmitter()
-	file.id = id || generateId()
+	file.id = id || alphanumericId(8)
 	file.metadata = metadata
 	file.mode = receive ? 'receive' : 'send'
 	file.status = 'queued'
@@ -31,7 +24,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		if (!msg.type || msg.payload === undefined) return
 		signaling.emit(msg.type, msg.payload)
 	})
-	signaling.send = (type, payload) => {
+	signaling.send = (type, payload = null) => {
 		const msg = JSON.stringify({type, payload})
 		signaling.write(msg)
 	}
@@ -47,6 +40,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		if (!currentFile) return
 		currentFile.progress += chunk.byteLength
 		currentFile.emit('data', chunk)
+		signaling.send('ack:' + currentFile.id)
 	})
 
 
@@ -110,16 +104,16 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 				} else {
 					data.write(chunk)
 					file.progress += chunk.byteLength
-					step()
 				}
 			})
 		}
+
 		step()
+		signaling.on('ack:' + file.id, step)
 	}
 
 	const receive = (file, cb) => { // as leader
 		startFile(file)
-
 		file.once('end', cb)
 	}
 
