@@ -24,7 +24,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		if (!msg.type || msg.payload === undefined) return
 		signaling.emit(msg.type, msg.payload)
 	})
-	signaling.send = (type, payload = null) => {
+	const sendSignal = (type, payload = null) => {
 		const msg = JSON.stringify({type, payload})
 		signaling.write(msg)
 	}
@@ -40,7 +40,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		if (!currentFile) return
 		currentFile.bytesTransferred += chunk.byteLength
 		currentFile.emit('data', chunk)
-		signaling.send('ack:' + currentFile.id)
+		sendSignal('ack:' + currentFile.id)
 	})
 
 
@@ -94,12 +94,9 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 				if (err) {
 					file.status = 'failed'
 					file.emit('error', err)
-					return
-				}
-
-				if (!chunk) { // end of file
+				} else if (!chunk) { // end of file
 					endCurrentFile()
-					signaling.send('done', file.id)
+					sendSignal('done', file.id)
 					cb()
 				} else {
 					data.write(chunk)
@@ -125,13 +122,13 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 			if (file.status !== 'queued') continue
 
 			if (file.mode === 'send') {
-				signaling.send('receive', file.id)
+				sendSignal('receive', file.id)
 				send(file, () => {
 					next()
 				})
 			} else {
 				receive(file, next)
-				signaling.send('send', file.id)
+				sendSignal('send', file.id)
 			}
 
 			return // abort loop
@@ -159,10 +156,10 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		file.read = read
 		files[file.id] = file
 
-		setImmediate(() => {
-			signaling.send('file', {id: file.id, meta})
+		setTimeout(() => {
+			sendSignal('file', {id: file.id, meta})
 			next()
-		})
+		}, 0)
 
 		return file
 	}
@@ -174,7 +171,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		files[id] = file
 		endpoint.emit('file', file)
 
-		setImmediate(next)
+		setTimeout(next, 0)
 	})
 
 	endpoint.files = files

@@ -9,7 +9,7 @@ const fromBuffer = (buf) => {
 		const chunk = buf.slice(offset, last)
 		offset = last
 
-		setImmediate(cb, null, chunk)
+		setTimeout(cb, 0, null, chunk)
 	}
 }
 
