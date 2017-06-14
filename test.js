@@ -139,7 +139,7 @@ test('tracks the file progress', (t) => {
 		let bytes = 0
 		file.on('data', (chunk) => {
 			bytes += chunk.byteLength
-			t.equal(file.progress, bytes)
+			t.equal(file.bytesTransferred, bytes)
 		})
 		file.once('end', () => t.end())
 	})

@@ -9,7 +9,7 @@ const createFile = (meta, receive = true, id) => {
 	file.meta = meta
 	file.mode = receive ? 'receive' : 'send'
 	file.status = 'queued'
-	file.progress = 0
+	file.bytesTransferred = 0
 	return file
 }
 
@@ -38,7 +38,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 
 	data.on('data', (chunk) => {
 		if (!currentFile) return
-		currentFile.progress += chunk.byteLength
+		currentFile.bytesTransferred += chunk.byteLength
 		currentFile.emit('data', chunk)
 		signaling.send('ack:' + currentFile.id)
 	})
@@ -103,7 +103,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 					cb()
 				} else {
 					data.write(chunk)
-					file.progress += chunk.byteLength
+					file.bytesTransferred += chunk.byteLength
 				}
 			})
 		}

@@ -39,7 +39,7 @@ leader.on('file', (file) => { // handle incoming file
 		console.log('leader started receiving', file.id)
 	})
 	file.on('data', (chunk) => {
-		console.log('leader received', file.progress, chunk.toString('hex'))
+		console.log('leader received', file.bytesTransferred, chunk.toString('hex'))
 	})
 	file.on('end', () => {
 		console.log('leader finished receiving', file.id)
