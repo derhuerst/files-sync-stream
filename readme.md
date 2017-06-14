@@ -12,7 +12,7 @@
 
 Tings still to be implemented:
 
-- A basic algorithm to determine the size of the next chunk to be transferred. Should be based on the time to transfer the last chunk. Needs [`ack`](https://en.wikipedia.org/wiki/Transmission_Control_Protocol#Protocol_operation)-ing of chunks.
+- A basic algorithm to determine the size of the next chunk to be transferred. Should be based on the time to transfer the last chunk.
 - Handling of connection loss, including continuing the sync. This needs a basic have/want logic.
 
 

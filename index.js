@@ -86,7 +86,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 
 
 
-	const send = (file, cb) => { // as leader
+	const send = (file, cb) => {
 		startFile(file)
 
 		const step = () => {
@@ -112,7 +112,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		signaling.on('ack:' + file.id, step)
 	}
 
-	const receive = (file, cb) => { // as leader
+	const receive = (file, cb) => {
 		startFile(file)
 		file.once('end', cb)
 	}
