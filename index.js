@@ -22,7 +22,7 @@ const createFile = (metadata, receive = true, id) => {
 // todo: reconnection logic
 // todo: stream error handling
 
-const createEndpoint = (data, signaling, isLeader) => {
+const createEndpoint = (data, signaling, isLeader = false) => {
 	signaling.on('data', (msg) => {
 		try {
 			msg = JSON.parse(msg.toString('utf8'))
@@ -78,6 +78,7 @@ const createEndpoint = (data, signaling, isLeader) => {
 	signaling.on('receive', (fileId) => {
 		if (!fileId || !files[fileId]) return
 		const file = files[fileId]
+
 		startFile(file)
 	})
 
@@ -85,7 +86,9 @@ const createEndpoint = (data, signaling, isLeader) => {
 		if (!fileId || !files[fileId]) return
 		const file = files[fileId]
 
-		send(file, () => {})
+		send(file, () => {
+			signaling.send('done', file.id)
+		})
 	})
 
 	signaling.on('done', (fileId) => {
@@ -96,24 +99,26 @@ const createEndpoint = (data, signaling, isLeader) => {
 
 
 	const send = (file, cb) => { // as leader
-		if (!currentFile || currentFile.id !== file.id) startFile(file)
+		startFile(file)
 
-		file.read(5, (err, chunk) => {
-			if (err) {
-				file.status = 'failed'
-				file.emit('error', err)
-				return
-			}
+		const step = () => {
+			file.read(5, (err, chunk) => {
+				if (err) {
+					file.status = 'failed'
+					file.emit('error', err)
+					return
+				}
 
-			if (!chunk) { // end of file
-				endCurrentFile()
-				signaling.send('done', file.id)
-				cb()
-			} else {
-				data.write(chunk)
-				send(file, cb)
-			}
-		})
+				if (!chunk) { // end of file
+					endCurrentFile()
+					cb()
+				} else {
+					data.write(chunk)
+					step()
+				}
+			})
+		}
+		step()
 	}
 
 	const receive = (file, cb) => { // as leader
@@ -135,8 +140,8 @@ const createEndpoint = (data, signaling, isLeader) => {
 					next()
 				})
 			} else {
-				signaling.send('send', file.id)
 				receive(file, next)
+				signaling.send('send', file.id)
 			}
 
 			return // abort loop
@@ -153,7 +158,7 @@ const createEndpoint = (data, signaling, isLeader) => {
 		files[file.id] = file
 
 		signaling.send('file', {id: file.id, metadata})
-		// endpoint.emit('file', file)
+		endpoint.emit('file', file)
 		next()
 	}
 
