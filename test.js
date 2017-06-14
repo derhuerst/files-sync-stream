@@ -1,7 +1,8 @@
 'use strict'
 
 const test = require('tape')
-const DuplexStream = require('stream').Duplex
+const {PassThrough} = require('stream')
+const duplexer = require('duplexer3')
 
 const endpoint = require('.')
 
@@ -14,6 +15,33 @@ const BAR = Buffer.from(
 	'76f213b8d373ea'
 , 'hex')
 
+const setup = () => {
+	const d1read = new PassThrough()
+	const d1write = new PassThrough()
+	const d2read = new PassThrough()
+	const d2write = new PassThrough()
+	d1write.pipe(d2read)
+	d2write.pipe(d1read)
+
+	const d1 = duplexer(d1write, d1read)
+	const d2 = duplexer(d2write, d2read)
+
+	const s1read = new PassThrough()
+	const s1write = new PassThrough()
+	const s2read = new PassThrough()
+	const s2write = new PassThrough()
+	s1write.pipe(s2read)
+	s2write.pipe(s1read)
+
+	const s1 = duplexer(s1write, s1read)
+	const s2 = duplexer(s2write, s2read)
+
+	return {
+		leader: endpoint(d1, s1, true),
+		follower: endpoint(d2, s2)
+	}
+}
+
 const fromBuffer = (buf) => {
 	let offset = 0
 	return (size, cb) => {
@@ -23,25 +51,12 @@ const fromBuffer = (buf) => {
 		const chunk = buf.slice(offset, last)
 		offset = last
 
-		cb(null, chunk)
-	}
-}
-
-const toBuffer = (cb) => {
-	let buf = new Buffer()
-	return (chunk) => {
-		if (chunk === null) return cb(buf)
-
-		buf = Buffer.concat([buf, chunk])
+		setImmediate(cb, null, chunk)
 	}
 }
 
 test('syncs metadata', (t) => {
-	const _data = new DuplexStream()
-	const _signaling = new DuplexStream()
-
-	const leader = endpoint(_data, _signaling, true)
-	const follower = endpoint(_data, _signaling)
+	const {leader, follower} = setup()
 
 	const fooMeta = {name: 'foo.bin', size: FOO.byteLength}
 	follower.add(fromBuffer(FOO), fooMeta)
@@ -50,32 +65,61 @@ test('syncs metadata', (t) => {
 
 	t.plan(2)
 	leader.on('file', (file) => {
-		t.deepEqual(file.meta, fooMeta)
+		t.deepEqual(file.metadata, fooMeta)
 	})
 	follower.on('file', (file) => {
-		t.deepEqual(file.meta, barMeta)
+		t.deepEqual(file.metadata, barMeta)
 	})
 })
 
-test('syncs data 💪', (t) => {
-	const _data = new DuplexStream()
-	const _signaling = new DuplexStream()
-
-	const leader = endpoint(_data, _signaling, true)
-	const follower = endpoint(_data, _signaling)
-
+test('syncs data follower -> leader 💪', (t) => {
+	const {leader, follower} = setup()
 	follower.add(fromBuffer(FOO))
 	leader.add(fromBuffer(BAR))
+	t.plan(4)
 
-	t.plan(2)
 	leader.on('file', (file) => {
-		file.on('data', toBuffer((receivedFoo) => {
-			t.equal(Buffer.compare(receivedFoo, FOO))
-		}))
+		file.on('start', () => {
+			t.equal(file.status, 'active')
+		})
+
+		let receivedFoo = Buffer.from([])
+		file.on('data', (chunk) => {
+			receivedFoo = Buffer.concat([receivedFoo, chunk])
+		})
+		file.on('end', () => {
+			t.equal(file.status, 'done')
+			t.equal(Buffer.compare(receivedFoo, FOO), 0)
+		})
 	})
+
+	leader.on('done', (file) => {
+		t.pass('endpoint emits done')
+	})
+})
+
+test.only('syncs data leader -> follower 💪', (t) => {
+	const {leader, follower} = setup()
+	follower.add(fromBuffer(FOO))
+	leader.add(fromBuffer(BAR))
+	t.plan(4)
+
 	follower.on('file', (file) => {
-		file.on('data', toBuffer((receivedBar) => {
-			t.equal(Buffer.compare(receivedBar, BAR))
-		}))
+		file.on('start', () => {
+			t.equal(file.status, 'active')
+		})
+
+		let receivedBar = Buffer.from([])
+		file.on('data', (chunk) => {
+			receivedBar = Buffer.concat([receivedBar, chunk])
+		})
+		file.on('end', () => {
+			t.equal(file.status, 'done')
+			t.equal(Buffer.compare(receivedBar, BAR), 0)
+		})
+	})
+
+	follower.on('done', (file) => {
+		t.pass('endpoint emits done')
 	})
 })
