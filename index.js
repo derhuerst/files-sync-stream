@@ -17,14 +17,17 @@ const createFile = (meta, receive = true, id) => {
 // todo: stream error handling
 
 const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => {
+	const signals = new EventEmitter()
+
 	signaling.on('data', (msg) => {
 		try {
 			msg = JSON.parse(msg.toString('utf8'))
 		} catch (err) {} // invalid message, ignore this
 		if (!msg.type || msg.payload === undefined) return
-		signaling.emit(msg.type, msg.payload)
+		signals.emit(msg.type, msg.payload)
 	})
-	const sendSignal = (type, payload = null) => {
+
+	signals.send = (type, payload = null) => {
 		const msg = JSON.stringify({type, payload})
 		signaling.write(msg)
 	}
@@ -40,7 +43,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		if (!currentFile) return
 		currentFile.bytesTransferred += chunk.byteLength
 		currentFile.emit('data', chunk)
-		sendSignal('ack:' + currentFile.id)
+		signals.send('ack:' + currentFile.id)
 	})
 
 
@@ -57,7 +60,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 	const startFile = (file) => {
 		if (currentFile) {
 			if (currentFile.id === file.id) return
-			endCurrentFile()
+			else endCurrentFile()
 		}
 
 		currentFile = file
@@ -65,21 +68,21 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		file.emit('start')
 	}
 
-	signaling.on('receive', (fileId) => {
+	signals.on('receive', (fileId) => {
 		if (!fileId || !files[fileId]) return
 		const file = files[fileId]
 
 		startFile(file)
 	})
 
-	signaling.on('send', (fileId) => {
+	signals.on('send', (fileId) => {
 		if (!fileId || !files[fileId]) return
 		const file = files[fileId]
 
 		send(file, checkIfDone)
 	})
 
-	signaling.on('done', (fileId) => {
+	signals.on('done', (fileId) => {
 		if (!fileId || !files[fileId]) return
 		endCurrentFile()
 	})
@@ -96,7 +99,8 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 					file.emit('error', err)
 				} else if (!chunk) { // end of file
 					endCurrentFile()
-					sendSignal('done', file.id)
+					signals.removeListener('ack:' + file.id, step)
+					signals.send('done', file.id)
 					cb()
 				} else {
 					data.write(chunk)
@@ -106,7 +110,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		}
 
 		step()
-		signaling.on('ack:' + file.id, step)
+		signals.on('ack:' + file.id, step)
 	}
 
 	const receive = (file, cb) => {
@@ -122,13 +126,13 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 			if (file.status !== 'queued') continue
 
 			if (file.mode === 'send') {
-				sendSignal('receive', file.id)
+				signals.send('receive', file.id)
 				send(file, () => {
 					next()
 				})
 			} else {
 				receive(file, next)
-				sendSignal('send', file.id)
+				signals.send('send', file.id)
 			}
 
 			return // abort loop
@@ -147,7 +151,7 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		done = true
 		endpoint.emit('done')
 	}
-	signaling.on('done', checkIfDone)
+	signals.on('done', checkIfDone)
 
 
 
@@ -157,14 +161,14 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		files[file.id] = file
 
 		setTimeout(() => {
-			sendSignal('file', {id: file.id, meta})
+			signals.send('file', {id: file.id, meta})
 			next()
 		}, 0)
 
 		return file
 	}
 
-	signaling.on('file', ({id, meta}) => {
+	signals.on('file', ({id, meta}) => {
 		if (!id) return
 
 		const file = createFile(meta, true, id)
