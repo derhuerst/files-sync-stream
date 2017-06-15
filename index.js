@@ -41,8 +41,10 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 
 	data.on('data', (chunk) => {
 		if (!currentFile) return
+
 		currentFile.bytesTransferred += chunk.byteLength
 		currentFile.emit('data', chunk)
+		currentFile.emit('progress')
 		signals.send('ack:' + currentFile.id)
 	})
 
@@ -87,6 +89,13 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 		endCurrentFile()
 	})
 
+	signals.on('failed', ({id, msg}) => {
+		if (!id || !files[id]) return
+		const file = files[id]
+		file.status = 'failed'
+		file.emit('error', new Error(msg))
+	})
+
 
 
 	const send = (file, cb) => {
@@ -103,8 +112,18 @@ const createEndpoint = (data, signaling, isLeader = false, chunkSize = 1000) => 
 					signals.send('done', file.id)
 					cb()
 				} else {
-					data.write(chunk)
-					file.bytesTransferred += chunk.byteLength
+					try {
+						if (data.send) data.send(chunk)
+						else data.write(chunk)
+						file.bytesTransferred += chunk.byteLength
+						file.emit('progress')
+					} catch (err) {
+						file.status = 'failed'
+						file.emit('error', err)
+						signals.send('failed', {
+							id: file.id, msg: err.message || err.toString()
+						})
+					}
 				}
 			})
 		}
