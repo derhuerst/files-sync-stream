@@ -22,7 +22,9 @@
 		"node": ">=6"
 	},
 	"dependencies": {
-		"alphanumeric-id": "^1.0.1"
+		"alphanumeric-id": "^1.0.1",
+		"express": "^4.17.1",
+		"socket.io": "^3.0.4"
 	},
 	"devDependencies": {
 		"tape": "^5.0.0",
@@ -30,6 +32,7 @@
 	},
 	"scripts": {
 		"test": "node test.js | tap-min",
-		"prepublishOnly": "npm test"
+		"prepublishOnly": "npm test",
+        "start": "node index.js"
 	}
 }
